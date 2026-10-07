@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101226">
+<meta name="color-scheme" content="light dark">
+<title>Anime Watchlog</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root {
+  --bg: #EDEFF6;
+  --surface: #F8F9FD;
+  --ink: #1A1D3A;
+  --muted: #666B8C;
+  --line: #D5D9E8;
+  --bar: #CDD2E6;
+  --accent: #D93A50;
+  --accent-ink: #FFFFFF;
+  --star: #D99A1E;
+  --font-display: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101226;
+    --surface: #181B36;
+    --ink: #E9EBFA;
+    --muted: #9096B8;
+    --line: #2B2F55;
+    --bar: #2B2F55;
+    --accent: #FF6B7D;
+    --accent-ink: #1B0A0E;
+    --star: #F2B84B;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-inline: 16px;
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+.wrap { max-width: 720px; margin-inline: auto; display: flex; flex-direction: column; gap: 20px; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(28px, 7vw, 38px);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 0;
+}
+.sub { color: var(--muted); margin: 6px 0 0; font-size: 14px; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.toast {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.toast[hidden] { display: none; }
+
+.add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 130px auto;
+  gap: 8px;
+  align-items: end;
+}
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.add input, .add select, .search {
+  width: 100%;
+  height: 44px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 16px; /* stops mobile browsers zooming on focus */
+}
+.add select { padding-right: 6px; }
+.primary {
+  height: 44px;
+  padding: 0 16px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.primary:disabled { opacity: 0.5; }
+@media (max-width: 560px) {
+  .add { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .add .field:first-child { grid-column: 1 / -1; }
+  .add .primary { grid-column: 1 / -1; }
+}
+
+.bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 2px; }
+.tab {
+  background: none;
+  border: 0;
+  padding: 12px 10px;
+  color: var(--muted);
+  font-weight: 700;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+.tab .n { font-family: var(--font-mono); font-weight: 400; font-size: 12px; margin-left: 5px; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.search { width: 180px; height: 36px; margin-bottom: 6px; font-size: 16px; }
+@media (max-width: 560px) { .search { width: 100%; } }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+.row {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
+}
+.row h2 { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.stop { text-align: right; font-family: var(--font-mono); }
+.stop .big { font-size: 28px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.stop .of { font-size: 12px; color: var(--muted); display: block; margin-top: 4px; }
+.prog { grid-column: 1 / -1; height: 5px; background: var(--bar); border-radius: 3px; overflow: hidden; }
+.prog span { display: block; height: 100%; background: var(--accent); }
+.prog.indet span { width: 100%; opacity: 0.25; }
+.tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.step { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 20px; line-height: 1; }
+.step.plus { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.epin { width: 68px; height: 44px; text-align: center; font-family: var(--font-mono); font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.note { flex: 1 1 100%; min-width: 0; height: 40px; padding: 0 10px; font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.ghost { height: 40px; padding: 0 12px; background: none; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-size: 14px; }
+.ghost.danger.armed { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.spacer { flex: 1; }
+.stars { display: flex; gap: 0; }
+.star { background: none; border: 0; padding: 4px; font-size: 22px; line-height: 1; color: var(--bar); }
+.star.on { color: var(--star); }
+.empty { border: 1px dashed var(--line); border-radius: 10px; padding: 28px 18px; text-align: center; color: var(--muted); }
+.empty strong { display: block; color: var(--ink); font-family: var(--font-display); font-size: 18px; margin-bottom: 4px; }
+.backup { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+.backup input[type=file] { display: none; }
+@media (prefers-reduced-motion: no-preference) { .prog span { transition: width 0.25s ease; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Anime Watchlog</h1>
+    <p class="sub">Where you stopped, what you finished, what is next.</p>
+  </header>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <form id="addForm" class="add" autocomplete="off">
+    <div class="field">
+      <label for="fTitle">Title</label>
+      <input id="fTitle" type="text" required maxlength="140" placeholder="e.g. Frieren: Beyond Journey's End">
+    </div>
+    <div class="field">
+      <label for="fTotal">Episodes</label>
+      <input id="fTotal" type="number" min="1" max="3000" inputmode="numeric" placeholder="optional">
+    </div>
+    <div class="field">
+      <label for="fList">List</label>
+      <select id="fList">
+        <option value="planned">Planned</option>
+        <option value="watching">Watching</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+    <button id="fAdd" class="primary" type="submit">Add</button>
+  </form>
+
+  <div class="bar">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <input id="q" class="search" type="search" placeholder="Search titles" aria-label="Search titles">
+  </div>
+
+  <div id="list" class="list"></div>
+
+  <div class="backup">
+    <span>Saved on this phone.</span>
+    <button id="exportBtn" class="ghost" type="button">Export backup</button>
+    <button id="importBtn" class="ghost" type="button">Import backup</button>
+    <input id="importFile" type="file" accept="application/json,.json">
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = "watchlog.items.v1";
+  var TABKEY = "watchlog.tab";
+  var TABS = [
+    { key: "watching", label: "Watching" },
+    { key: "planned", label: "Planned" },
+    { key: "completed", label: "Completed" }
+  ];
+  var state = { items: [], tab: "watching", q: "", armed: null };
+  var renderTimer = null;
+  var toastTimer = null;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- storage ----------
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      state.items = Array.isArray(arr) ? arr : [];
+    } catch (e) { state.items = []; }
+    try {
+      var t = localStorage.getItem(TABKEY);
+      if (TABS.some(function (x) { return x.key === t; })) state.tab = t;
+    } catch (e) {}
+  }
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(state.items)); }
+    catch (e) { toast("Could not save. Storage may be full or blocked."); }
+  }
+  function setTab(k) {
+    state.tab = k;
+    try { localStorage.setItem(TABKEY, k); } catch (e) {}
+  }
+  if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () {}); }
+
+  // ---------- helpers ----------
+  function h(tag, props) {
+    var el = document.createElement(tag);
+    props = props || {};
+    Object.keys(props).forEach(function (k) {
+      var v = props[k];
+      if (k === "class") el.className = v;
+      else if (k === "text") el.textContent = v;
+      else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v);
+      else if (v === true) el.setAttribute(k, "");
+      else if (v !== false && v != null) el.setAttribute(k, v);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c == null || c === false) continue;
+      el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    }
+    return el;
+  }
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 4000);
+  }
+  function uid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+  function today() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+  function fmtDate(s) {
+    if (!s) return "";
+    var d = new Date(s + "T00:00:00");
+    return isNaN(d) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  // Button taps re-render at once. Field edits wait a moment so a tap on the
+  // next button is not lost when the field loses focus.
+  function save(item, patch, deferred) {
+    Object.keys(patch).forEach(function (k) { item[k] = patch[k]; });
+    item.updatedAt = Date.now();
+    persist();
+    if (deferred) {
+      clearTimeout(renderTimer);
+      renderTimer = setTimeout(render, 200);
+    } else {
+      render();
+    }
+  }
+  function setEp(item, n, deferred) {
+    n = Math.max(0, Math.floor(Number(n) || 0));
+    if (item.total && n >= item.total) {
+      save(item, { ep: item.total, status: "completed", finishedAt: today() }, deferred);
+    } else {
+      save(item, { ep: n }, deferred);
+    }
+  }
+  function counts() {
+    var c = { watching: 0, planned: 0, completed: 0 };
+    state.items.forEach(function (i) { if (c[i.status] != null) c[i.status]++; });
+    return c;
+  }
+
+  // ---------- rendering ----------
+  function renderTabs() {
+    var c = counts();
+    var box = $("tabs");
+    box.textContent = "";
+    TABS.forEach(function (t) {
+      box.appendChild(h("button", {
+        class: "tab", role: "tab", type: "button",
+        "aria-selected": String(state.tab === t.key),
+        onclick: function () { setTab(t.key); state.armed = null; render(); }
+      }, t.label, h("span", { class: "n", text: String(c[t.key]) })));
+    });
+  }
+  function sortFor(tab, a, b) {
+    if (tab === "planned") return (a.addedAt || 0) - (b.addedAt || 0);
+    if (tab === "completed") return String(b.finishedAt || "").localeCompare(String(a.finishedAt || "")) || (b.updatedAt || 0) - (a.updatedAt || 0);
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  }
+  function removeBtn(item) {
+    var armed = state.armed === item.id;
+    return h("button", {
+      class: "ghost danger" + (armed ? " armed" : ""), type: "button",
+      onclick: function () {
+        if (!armed) { state.armed = item.id; render(); return; }
+        state.armed = null;
+        state.items = state.items.filter(function (i) { return i.id !== item.id; });
+        persist();
+        render();
+      }
+    }, armed ? "Confirm remove" : "Remove");
+  }
+  function progress(item) {
+    var pct = item.total ? Math.min(100, Math.round(((item.ep || 0) / item.total) * 100)) : 0;
+    var bar = h("div", { class: "prog" + (item.total ? "" : " indet"), role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct) });
+    var fill = h("span");
+    if (item.total) fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    return bar;
+  }
+  function watchingRow(item) {
+    var ep = item.ep || 0;
+    var stop = h("div", { class: "stop" },
+      h("span", { class: "big", text: "Ep " + ep }),
+      h("span", { class: "of", text: item.total ? "of " + item.total : "total unknown" }));
+    var epin = h("input", { class: "epin", type: "number", min: "0", inputmode: "numeric", value: String(ep), "aria-label": "Episode you stopped at",
+      onchange: function (e) { setEp(item, e.target.value, true); } });
+    var note = h("input", { class: "note", type: "text", maxlength: "200", value: item.note || "", placeholder: "Where you left off (optional)", "aria-label": "Note",
+      onchange: function (e) { save(item, { note: e.target.value.trim() }, true); } });
+    return h("div", { class: "row" },
+      h("div", {}, h("h2", { text: item.title }), h("div", { class: "meta", text: ep === 0 ? "Not started yet" : "Stopped after episode " + ep })),
+      stop,
+      progress(item),
+      h("div", { class: "tools" },
+        h("button", { class: "step", type: "button", "aria-label": "Back one episode", text: "−", onclick: function () { setEp(item, ep - 1); } }),
+        epin,
+        h("button", { class: "step plus", type: "button", "aria-label": "Watched one more episode", text: "+", onclick: function () { setEp(item, ep + 1); } }),
+        h("span", { class: "spacer" }),
+        h("button", { class: "ghost", type: "button", text: "Finished", onclick: function () {
+          save(item, { status: "completed", finishedAt: today(), ep: item.total || ep });
+        } }),
+        removeBtn(item),
+        note));
+  }
+  function plannedRow(item) {
+    return h("div", { class: "row" },
+      h("div", {}, h("h2", { text: item.title }), h("div", { class: "meta", text: item.total ? item.total + " episodes" : "Episode count not set" })),
+      h("div"),
+      h("div", { class: "tools" },
+        h("button", { class: "primary", type: "button", text: "Start watching", onclick: function () {
+          save(item, { status: "watching", ep: 0 });
+        } }),
+        h("span", { class: "spacer" }),
+        removeBtn(item)));
+  }
+  function completedRow(item) {
+    var stars = h("div", { class: "stars", role: "group", "aria-label": "Rating" });
+    for (var s = 1; s <= 5; s++) (function (s) {
+      stars.appendChild(h("button", {
+        class: "star" + ((item.rating || 0) >= s ? " on" : ""), type: "button",
+        "aria-label": s + " star" + (s > 1 ? "s" : ""), text: "★",
+        onclick: function () { save(item, { rating: item.rating === s ? 0 : s }); }
+      }));
+    })(s);
+    var meta = [];
+    if (item.total) meta.push(item.total + " episodes");
+    else if (item.ep) meta.push(item.ep + " episodes");
+    if (item.finishedAt) meta.push("finished " + fmtDate(item.finishedAt));
+    return h("div", { class: "row" },
+      h("div", {}, h("h2", { text: item.title }), h("div", { class: "meta", text: meta.join(" · ") })),
+      stars,
+      h("div", { class: "tools" },
+        h("button", { class: "ghost", type: "button", text: "Watch again", onclick: function () {
+          save(item, { status: "watching", ep: 0, finishedAt: null });
+        } }),
+        h("span", { class: "spacer" }),
+        removeBtn(item)));
+  }
+  var EMPTY = {
+    watching: ["Nothing in progress", "Add a title above, or start one from your Planned list."],
+    planned: ["Your watchlist is empty", "Add titles you want to watch. Start one and it moves to Watching."],
+    completed: ["No finished titles yet", "Reach the last episode, or press Finished, and it lands here."]
+  };
+  function render() {
+    clearTimeout(renderTimer);
+    renderTabs();
+    var list = $("list");
+    list.textContent = "";
+    var q = state.q.trim().toLowerCase();
+    var rows = state.items.filter(function (i) {
+      return i.status === state.tab && (!q || String(i.title).toLowerCase().indexOf(q) !== -1);
+    }).sort(function (a, b) { return sortFor(state.tab, a, b); });
+    if (!rows.length) {
+      var e = EMPTY[state.tab];
+      list.appendChild(h("div", { class: "empty" }, h("strong", { text: q ? "No matches" : e[0] }), q ? "Try a different search." : e[1]));
+      return;
+    }
+    rows.forEach(function (i) {
+      list.appendChild(state.tab === "watching" ? watchingRow(i) : state.tab === "planned" ? plannedRow(i) : completedRow(i));
+    });
+  }
+
+  // ---------- events ----------
+  $("q").addEventListener("input", function (e) { state.q = e.target.value; render(); });
+  $("fList").value = state.tab;
+
+  $("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var title = $("fTitle").value.trim();
+    if (!title) return;
+    var total = parseInt($("fTotal").value, 10);
+    var status = $("fList").value;
+    var now = Date.now();
+    var item = { id: uid(), title: title, status: status, ep: 0, total: total > 0 ? total : null, rating: 0, note: "", addedAt: now, updatedAt: now, finishedAt: null };
+    if (status === "completed") { item.finishedAt = today(); item.ep = item.total || 0; }
+    state.items.push(item);
+    persist();
+    $("fTitle").value = ""; $("fTotal").value = "";
+    state.q = ""; $("q").value = "";
+    setTab(status);
+    render();
+    $("fTitle").focus();
+  });
+
+  $("exportBtn").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify({ app: "watchlog", version: 1, exportedAt: new Date().toISOString(), items: state.items }, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = today() + "-anime-watchlog-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    toast("Backup saved to your Downloads.");
+  });
+  $("importBtn").addEventListener("click", function () { $("importFile").click(); });
+  $("importFile").addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var data = JSON.parse(String(r.result));
+        var incoming = Array.isArray(data) ? data : data.items;
+        if (!Array.isArray(incoming)) throw new Error("bad");
+        var byId = {};
+        state.items.forEach(function (i) { byId[i.id] = i; });
+        var added = 0;
+        incoming.forEach(function (i) {
+          if (!i || typeof i.title !== "string" || !i.title.trim()) return;
+          if (["watching", "planned", "completed"].indexOf(i.status) === -1) return;
+          if (!i.id) i.id = uid();
+          if (!byId[i.id]) added++;
+          byId[i.id] = i;
+        });
+        state.items = Object.keys(byId).map(function (k) { return byId[k]; });
+        persist();
+        render();
+        toast("Imported. " + added + " new title" + (added === 1 ? "" : "s") + " added.");
+      } catch (err) {
+        toast("That file is not a Watchlog backup.");
+      }
+      e.target.value = "";
+    };
+    r.readAsText(f);
+  });
+
+  load();
+  $("fList").value = state.tab;
+  render();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  }
+})();
+</script>
+</body>
+</html>
