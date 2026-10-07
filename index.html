@@ -148,13 +148,45 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .step { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 20px; line-height: 1; }
 .step.plus { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
 .epin { width: 68px; height: 44px; text-align: center; font-family: var(--font-mono); font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
-.note { flex: 1 1 100%; min-width: 0; height: 40px; padding: 0 10px; font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.note { grid-column: 1 / -1; width: 100%; min-width: 0; height: 40px; padding: 0 10px; font-size: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 .ghost { height: 40px; padding: 0 12px; background: none; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-size: 14px; }
 .ghost.danger.armed { border-color: var(--accent); color: var(--accent); font-weight: 700; }
 .spacer { flex: 1; }
 .stars { display: flex; gap: 0; }
 .star { background: none; border: 0; padding: 4px; font-size: 22px; line-height: 1; color: var(--bar); }
 .star.on { color: var(--star); }
+/* Cards with a cover: the picture fills the card, a dark fade keeps text readable in light and dark theme. */
+.row { overflow: hidden; }
+.row.has-cover {
+  --ink: #F4F5FF;
+  --muted: #CDD1EC;
+  --line: rgba(255, 255, 255, 0.26);
+  --bar: rgba(255, 255, 255, 0.3);
+  --bg: rgba(8, 10, 24, 0.55);
+  color: var(--ink);
+  border-color: transparent;
+  background-image:
+    linear-gradient(0deg, rgba(8, 10, 24, 0.82) 0%, rgba(8, 10, 24, 0) 62%),
+    linear-gradient(90deg, rgba(8, 10, 24, 0.86) 0%, rgba(8, 10, 24, 0.38) 100%),
+    var(--cover);
+  background-size: cover;
+  background-position: center 22%;
+  background-repeat: no-repeat;
+}
+.row.has-cover h2, .row.has-cover .stop { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65); }
+.row.has-cover .ghost { background: rgba(8, 10, 24, 0.45); }
+.tools.minor .ghost { height: 34px; font-size: 13px; padding: 0 10px; }
+.coverpanel {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.coverpanel .ghost { height: 34px; font-size: 13px; padding: 0 10px; }
+.coverpanel .hint { flex: 1 1 100%; font-size: 12px; color: var(--muted); }
 .empty { border: 1px dashed var(--line); border-radius: 10px; padding: 28px 18px; text-align: center; color: var(--muted); }
 .empty strong { display: block; color: var(--ink); font-family: var(--font-display); font-size: 18px; margin-bottom: 4px; }
 .backup { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
@@ -203,6 +235,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     <button id="exportBtn" class="ghost" type="button">Export backup</button>
     <button id="importBtn" class="ghost" type="button">Import backup</button>
     <input id="importFile" type="file" accept="application/json,.json">
+    <input id="coverFile" type="file" accept="image/*">
   </div>
 </div>
 
@@ -292,10 +325,112 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     persist();
     if (deferred) {
       clearTimeout(renderTimer);
-      renderTimer = setTimeout(render, 200);
+      renderTimer = setTimeout(safeRender, 200);
     } else {
       render();
     }
+  }
+  // Redraw, but not while a field inside the list has the keyboard open.
+  function safeRender(tries) {
+    tries = typeof tries === "number" ? tries : 0;
+    var a = document.activeElement;
+    if (a && a.tagName === "INPUT" && $("list").contains(a) && tries < 20) {
+      clearTimeout(renderTimer);
+      renderTimer = setTimeout(function () { safeRender(tries + 1); }, 800);
+      return;
+    }
+    render();
+  }
+  function byId(id) {
+    for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i];
+    return null;
+  }
+
+  // ---------- covers ----------
+  var LOOKUP = "query($s:String){Page(perPage:1){media(search:$s,type:ANIME,sort:SEARCH_MATCH){coverImage{extraLarge large}}}}";
+  // Resolves a picture address, or null when AniList has no match. Rejects on network or rate-limit errors.
+  function lookup(title) {
+    return fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ query: LOOKUP, variables: { s: title } })
+    }).then(function (r) {
+      if (r.status === 429) { var e = new Error("rate"); e.rate = true; throw e; }
+      return r.json();
+    }).then(function (j) {
+      var m = j && j.data && j.data.Page && j.data.Page.media && j.data.Page.media[0];
+      var c = m && m.coverImage;
+      return (c && (c.extraLarge || c.large)) || null;
+    });
+  }
+  function findCover(item, manual) {
+    if (manual) toast("Looking for the cover…");
+    return lookup(item.title).then(function (url) {
+      if (url) {
+        save(item, { cover: url, coverSrc: "auto", coverTried: true }, true);
+        if (manual) toast("Cover added.");
+      } else {
+        item.coverTried = true;
+        persist();
+        if (manual) toast("No cover found for this title. Try Choose image.");
+      }
+    }).catch(function (e) {
+      if (manual) toast(e && e.rate ? "AniList is busy. Try again in a minute." : "Could not reach AniList. Check your connection.");
+    });
+  }
+  // On start, look up covers for titles that never had a lookup. One at a time, to stay under AniList's rate limit.
+  function backfill() {
+    if (navigator.onLine === false) return;
+    var queue = state.items.filter(function (i) { return !i.cover && !i.coverTried; });
+    (function next() {
+      var it = queue.shift();
+      if (!it) return;
+      findCover(it, false).then(function () { setTimeout(next, 800); });
+    })();
+  }
+  // Shrink a picture from the phone so it stays small in storage.
+  function shrink(file) {
+    return new Promise(function (resolve, reject) {
+      var u = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var max = 560, w = img.naturalWidth, ht = img.naturalHeight;
+        var k = Math.min(1, max / Math.max(w, ht));
+        var c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(w * k));
+        c.height = Math.max(1, Math.round(ht * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(u);
+        resolve(c.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = function () { URL.revokeObjectURL(u); reject(new Error("img")); };
+      img.src = u;
+    });
+  }
+  function coverBtn(item) {
+    return h("button", {
+      class: "ghost", type: "button", text: item.cover ? "Cover" : "Add cover",
+      onclick: function () { state.coverFor = state.coverFor === item.id ? null : item.id; render(); }
+    });
+  }
+  function coverPanel(item) {
+    return h("div", { class: "coverpanel" },
+      h("button", { class: "ghost", type: "button", text: "Find online", onclick: function () { findCover(item, true); } }),
+      h("button", { class: "ghost", type: "button", text: "Choose image", onclick: function () { state.uploadFor = item.id; $("coverFile").click(); } }),
+      item.cover ? h("button", { class: "ghost", type: "button", text: "Clear cover", onclick: function () {
+        save(item, { cover: null, coverSrc: null, coverTried: true });
+      } }) : null,
+      h("span", { class: "spacer" }),
+      h("button", { class: "ghost", type: "button", text: "Done", onclick: function () { state.coverFor = null; render(); } }),
+      h("div", { class: "hint", text: "Find online looks the title up on AniList. Choose image uses a picture from your phone." }));
+  }
+  function decorate(row, item) {
+    if (item.cover) {
+      row.classList.add("has-cover");
+      row.style.setProperty("--cover", 'url("' + String(item.cover).replace(/"/g, "%22") + '")');
+    }
+    if (state.coverFor === item.id) row.appendChild(coverPanel(item));
+    return row;
   }
   function setEp(item, n, deferred) {
     n = Math.max(0, Math.floor(Number(n) || 0));
@@ -370,19 +505,20 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         h("span", { class: "spacer" }),
         h("button", { class: "ghost", type: "button", text: "Finished", onclick: function () {
           save(item, { status: "completed", finishedAt: today(), ep: item.total || ep });
-        } }),
-        removeBtn(item),
-        note));
+        } })),
+      note,
+      h("div", { class: "tools minor" }, coverBtn(item), removeBtn(item)));
   }
   function plannedRow(item) {
     return h("div", { class: "row" },
       h("div", {}, h("h2", { text: item.title }), h("div", { class: "meta", text: item.total ? item.total + " episodes" : "Episode count not set" })),
       h("div"),
-      h("div", { class: "tools" },
+      h("div", { class: "tools minor" },
         h("button", { class: "primary", type: "button", text: "Start watching", onclick: function () {
           save(item, { status: "watching", ep: 0 });
         } }),
         h("span", { class: "spacer" }),
+        coverBtn(item),
         removeBtn(item)));
   }
   function completedRow(item) {
@@ -401,11 +537,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     return h("div", { class: "row" },
       h("div", {}, h("h2", { text: item.title }), h("div", { class: "meta", text: meta.join(" · ") })),
       stars,
-      h("div", { class: "tools" },
+      h("div", { class: "tools minor" },
         h("button", { class: "ghost", type: "button", text: "Watch again", onclick: function () {
           save(item, { status: "watching", ep: 0, finishedAt: null });
         } }),
         h("span", { class: "spacer" }),
+        coverBtn(item),
         removeBtn(item)));
   }
   var EMPTY = {
@@ -428,7 +565,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       return;
     }
     rows.forEach(function (i) {
-      list.appendChild(state.tab === "watching" ? watchingRow(i) : state.tab === "planned" ? plannedRow(i) : completedRow(i));
+      var row = state.tab === "watching" ? watchingRow(i) : state.tab === "planned" ? plannedRow(i) : completedRow(i);
+      list.appendChild(decorate(row, i));
     });
   }
 
@@ -452,6 +590,19 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     setTab(status);
     render();
     $("fTitle").focus();
+    if (navigator.onLine !== false) findCover(item, false);
+  });
+
+  $("coverFile").addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0];
+    var item = byId(state.uploadFor);
+    e.target.value = "";
+    if (!f || !item) return;
+    shrink(f).then(function (url) {
+      state.coverFor = null;
+      save(item, { cover: url, coverSrc: "custom", coverTried: true });
+      toast("Cover saved.");
+    }).catch(function () { toast("Could not read that image."); });
   });
 
   $("exportBtn").addEventListener("click", function () {
@@ -501,6 +652,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   load();
   $("fList").value = state.tab;
   render();
+  setTimeout(backfill, 1200);
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
