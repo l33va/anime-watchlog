@@ -1,5 +1,5 @@
 // Offline cache for Anime Watchlog. Bump CACHE when you change any app file.
-var CACHE = "watchlog-v2";
+var CACHE = "watchlog-v3";
 var COVERS = "watchlog-covers"; // cover pictures seen so far, kept across app updates
 var MAX_COVERS = 150;
 var FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
