@@ -257,6 +257,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 .sug .s { font-family: var(--font-mono); font-size: 11px; color: var(--label); white-space: nowrap; }
 .sug button[aria-selected="true"] { background: var(--inv); color: var(--inv-ink); }
 .sug button[aria-selected="true"] .s { color: inherit; }
+.sug .say { padding: 10px 8px; font-family: var(--font-mono); font-size: 11px; color: var(--label); text-transform: lowercase; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .trk {
   display: grid;
@@ -364,7 +365,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     <input id="coverFile" type="file" accept="image/*">
   </footer>
 </main>
-<p class="serial">wl&#8211;1 &#183; pocket watchlog &#183; no. 000001</p>
+<p class="serial">wl&#8211;1 &#183; pocket watchlog &#183; fw 1.4</p>
 
 <script>
 (function () {
@@ -562,11 +563,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 
   // ---------- title suggestions ----------
   var SUGGEST = "query($s:String){Page(perPage:6){media(search:$s,type:ANIME,sort:SEARCH_MATCH){title{romaji english}episodes seasonYear coverImage{extraLarge large medium}}}}";
-  var sug = { timer: null, seq: 0, rows: [], active: -1, picked: null };
+  var sug = { timer: null, seq: 0, rows: [], active: -1, picked: null, say: "" };
   function hideSug() {
     clearTimeout(sug.timer);
     sug.seq++;
-    sug.rows = []; sug.active = -1;
+    sug.rows = []; sug.active = -1; sug.say = "";
     $("sug").hidden = true;
     $("sug").textContent = "";
     $("fTitle").setAttribute("aria-expanded", "false");
@@ -592,7 +593,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
         onclick: function () { pickSug(r); }
       }, pic, h("span", { class: "t", text: r.title }), h("span", { class: "s", text: side.join(" · ") })));
     });
-    box.hidden = !sug.rows.length;
+    if (sug.say) box.appendChild(h("div", { class: "say", text: sug.say }));
+    box.hidden = !sug.rows.length && !sug.say;
     $("fTitle").setAttribute("aria-expanded", String(!!sug.rows.length));
     if (sug.active >= 0) $("fTitle").setAttribute("aria-activedescendant", "sug" + sug.active);
     else $("fTitle").removeAttribute("aria-activedescendant");
@@ -603,7 +605,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({ query: SUGGEST, variables: { s: text } })
-    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    }).then(function (r) {
+      if (!r.ok) { var e = new Error("http"); e.busy = true; throw e; }
+      return r.json();
+    }).then(function (j) {
       if (mine !== sug.seq) return; // a newer keystroke or a pick won
       var media = (j && j.data && j.data.Page && j.data.Page.media) || [];
       var seen = {};
@@ -617,14 +622,22 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
         return true;
       });
       sug.active = -1;
+      sug.say = sug.rows.length ? "" : "no matches on anilist. you can still add it.";
       drawSug();
-    }).catch(function () {}); // offline or busy: typing still works without suggestions
+    }).catch(function (e) {
+      // Typing still works without suggestions; say why there are none.
+      if (mine !== sug.seq) return;
+      sug.rows = []; sug.active = -1;
+      sug.say = e && e.busy ? "anilist is busy. try again in a minute." : "could not reach anilist. you can still add it.";
+      drawSug();
+    });
   }
   $("fTitle").addEventListener("input", function (e) {
     var text = e.target.value.trim();
     sug.picked = null;
     clearTimeout(sug.timer);
-    if (text.length < 2 || navigator.onLine === false) { hideSug(); return; }
+    if (text.length < 2) { hideSug(); return; }
+    if (!sug.rows.length) { sug.say = "searching anilist…"; drawSug(); }
     sug.timer = setTimeout(function () { suggest(text); }, 350);
   });
   $("fTitle").addEventListener("keydown", function (e) {

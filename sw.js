@@ -1,5 +1,5 @@
 // Offline cache for Anime Watchlog. Bump CACHE when you change any app file.
-var CACHE = "watchlog-v8";
+var CACHE = "watchlog-v9";
 var COVERS = "watchlog-covers"; // cover pictures seen so far, kept across app updates
 var MAX_COVERS = 150;
 var FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
@@ -49,7 +49,8 @@ self.addEventListener("fetch", function (e) {
   // The app page: try the network first so updates show up, fall back to the saved copy offline.
   if (req.mode === "navigate" || url.pathname.slice(-1) === "/" || url.pathname.slice(-10) === "index.html") {
     e.respondWith(
-      fetch(req).then(function (res) {
+      // "no-cache" asks the server every time, so an update is not hidden by the browser's own cache.
+      fetch(req.url, { cache: "no-cache" }).then(function (res) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) { c.put(req, copy); });
         return res;
