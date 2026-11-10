@@ -249,6 +249,14 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 .fn .key.armed { background: var(--inv); color: var(--inv-ink); border-color: #000000; font-weight: 700; }
 .hint { font-size: 11px; color: var(--label); margin: 0; }
 
+.sug { display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--field); border: 1px solid var(--edge); border-radius: 8px; }
+.sug button { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 50px; padding: 4px 8px; background: none; border: 0; border-radius: 6px; text-align: left; }
+.sug .pic { width: 30px; height: 42px; background: var(--track); display: block; overflow: hidden; }
+.sug img { width: 100%; height: 100%; object-fit: cover; display: block; filter: grayscale(1); }
+.sug .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sug .s { font-family: var(--font-mono); font-size: 11px; color: var(--label); white-space: nowrap; }
+.sug button[aria-selected="true"] { background: var(--inv); color: var(--inv-ink); }
+.sug button[aria-selected="true"] .s { color: inherit; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .trk {
   display: grid;
@@ -327,7 +335,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     <form id="addForm" class="rec" autocomplete="off">
       <div class="field">
         <label class="label" for="fTitle">title</label>
-        <input id="fTitle" class="inp" type="text" required maxlength="140" placeholder="e.g. Frieren: Beyond Journey's End">
+        <input id="fTitle" class="inp" type="text" required maxlength="140" placeholder="e.g. Frieren: Beyond Journey's End" role="combobox" aria-autocomplete="list" aria-controls="sug" aria-expanded="false">
+        <div id="sug" class="sug" role="listbox" aria-label="Title suggestions" hidden></div>
       </div>
       <div class="field">
         <label class="label" for="fTotal">episodes</label>
@@ -550,6 +559,89 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
       img.src = u;
     });
   }
+
+  // ---------- title suggestions ----------
+  var SUGGEST = "query($s:String){Page(perPage:6){media(search:$s,type:ANIME,sort:SEARCH_MATCH){title{romaji english}episodes seasonYear coverImage{extraLarge large medium}}}}";
+  var sug = { timer: null, seq: 0, rows: [], active: -1, picked: null };
+  function hideSug() {
+    clearTimeout(sug.timer);
+    sug.seq++;
+    sug.rows = []; sug.active = -1;
+    $("sug").hidden = true;
+    $("sug").textContent = "";
+    $("fTitle").setAttribute("aria-expanded", "false");
+    $("fTitle").removeAttribute("aria-activedescendant");
+  }
+  function pickSug(r) {
+    $("fTitle").value = r.title;
+    if (r.episodes) $("fTotal").value = String(r.episodes);
+    sug.picked = r;
+    hideSug();
+  }
+  function drawSug() {
+    var box = $("sug");
+    box.textContent = "";
+    sug.rows.forEach(function (r, i) {
+      var pic = h("span", { class: "pic" });
+      if (r.thumb) pic.appendChild(h("img", { src: r.thumb, alt: "", loading: "lazy" }));
+      var side = [];
+      if (r.episodes) side.push(r.episodes + " eps");
+      if (r.year) side.push(String(r.year));
+      box.appendChild(h("button", { id: "sug" + i, type: "button", role: "option", "aria-selected": String(i === sug.active), "data-f": "600",
+        onpointerdown: function (e) { e.preventDefault(); }, // keep the keyboard open
+        onclick: function () { pickSug(r); }
+      }, pic, h("span", { class: "t", text: r.title }), h("span", { class: "s", text: side.join(" · ") })));
+    });
+    box.hidden = !sug.rows.length;
+    $("fTitle").setAttribute("aria-expanded", String(!!sug.rows.length));
+    if (sug.active >= 0) $("fTitle").setAttribute("aria-activedescendant", "sug" + sug.active);
+    else $("fTitle").removeAttribute("aria-activedescendant");
+  }
+  function suggest(text) {
+    var mine = ++sug.seq;
+    fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ query: SUGGEST, variables: { s: text } })
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (mine !== sug.seq) return; // a newer keystroke or a pick won
+      var media = (j && j.data && j.data.Page && j.data.Page.media) || [];
+      var seen = {};
+      sug.rows = media.map(function (m) {
+        var c = m.coverImage || {};
+        return { title: (m.title && (m.title.english || m.title.romaji)) || "", episodes: m.episodes || null, year: m.seasonYear || null,
+          thumb: c.medium || c.large || null, cover: c.extraLarge || c.large || null };
+      }).filter(function (r) {
+        if (!r.title || seen[r.title]) return false;
+        seen[r.title] = true;
+        return true;
+      });
+      sug.active = -1;
+      drawSug();
+    }).catch(function () {}); // offline or busy: typing still works without suggestions
+  }
+  $("fTitle").addEventListener("input", function (e) {
+    var text = e.target.value.trim();
+    sug.picked = null;
+    clearTimeout(sug.timer);
+    if (text.length < 2 || navigator.onLine === false) { hideSug(); return; }
+    sug.timer = setTimeout(function () { suggest(text); }, 350);
+  });
+  $("fTitle").addEventListener("keydown", function (e) {
+    if (!sug.rows.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      var n = sug.rows.length;
+      sug.active = e.key === "ArrowDown" ? (sug.active + 1) % n : (sug.active <= 0 ? n - 1 : sug.active - 1);
+      drawSug();
+    } else if (e.key === "Enter" && sug.active >= 0) {
+      e.preventDefault();
+      pickSug(sug.rows[sug.active]);
+    } else if (e.key === "Escape") {
+      hideSug();
+    }
+  });
+  $("fTitle").addEventListener("blur", function () { setTimeout(hideSug, 150); });
 
   // ---------- model ----------
   function setEp(item, n, deferred) {
@@ -919,6 +1011,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     var now = Date.now();
     var item = { id: uid(), title: title, status: status, ep: 0, total: total > 0 ? total : null, rating: 0, note: "", addedAt: now, updatedAt: now, finishedAt: null };
     if (status === "completed") { item.finishedAt = today(); item.ep = item.total || 0; }
+    // A picked suggestion already carries its cover, so no second lookup is needed.
+    var picked = sug.picked && sug.picked.title === title ? sug.picked : null;
+    if (picked && picked.cover) { item.cover = picked.cover; item.coverSrc = "auto"; item.coverTried = true; }
+    sug.picked = null;
+    hideSug();
     state.items.push(item);
     persist();
     $("fTitle").value = ""; $("fTotal").value = "";
@@ -927,7 +1024,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     state.sel[status] = item.id;
     render();
     toast("Recorded to " + status + ".");
-    if (navigator.onLine !== false) findCover(item, false);
+    if (!item.cover && navigator.onLine !== false) findCover(item, false);
   });
 
   $("coverFile").addEventListener("change", function (e) {
