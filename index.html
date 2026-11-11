@@ -84,9 +84,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 [hidden] { display: none !important; }
 
 /* ---------- the unit ---------- */
+.stack { max-width: 460px; margin-inline: auto; display: flex; flex-direction: column; gap: 12px; }
 .unit {
-  max-width: 460px;
-  margin-inline: auto;
   background: var(--body);
   border: 1px solid var(--edge);
   border-radius: 22px;
@@ -227,6 +226,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 
 /* ---------- panels ---------- */
 .panel { border-top: 1px solid var(--edge); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.unit.cell { gap: 8px; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .inp {
@@ -257,6 +257,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 .sug .s { font-family: var(--font-mono); font-size: 11px; color: var(--label); white-space: nowrap; }
 .sug button[aria-selected="true"] { background: var(--inv); color: var(--inv-ink); }
 .sug button[aria-selected="true"] .s { color: inherit; }
+.sug .say { padding: 10px 8px; font-family: var(--font-mono); font-size: 11px; color: var(--label); text-transform: lowercase; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .trk {
   display: grid;
@@ -287,7 +288,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 .rec .field:first-child { grid-column: 1 / -1; }
 .rec .key.round { background: #E8421A; color: #FFFFFF; border-color: #9B2A0E; box-shadow: 0 3px 0 #9B2A0E; font-size: 11px; letter-spacing: 0.06em; }
 .rec .key.round:active { box-shadow: none; }
-.foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.unit.foot { flex-direction: row; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
 .foot .fn { flex: 0 0 auto; }
 .foot .fn .key { flex: 0 0 auto; padding: 0 12px; }
 .foot input[type=file] { display: none; }
@@ -299,30 +300,20 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 </style>
 </head>
 <body data-tab="watching">
-<main class="unit">
-  <header class="plate">
-    <h1 class="brand"><b>wl&#8211;1</b> anime watchlog</h1>
-    <span class="grille" aria-hidden="true"></span>
-    <button id="thm" class="snd" type="button" aria-pressed="false"><span>dark</span><i aria-hidden="true"></i></button>
-    <button id="snd" class="snd" type="button" aria-pressed="false"><span>sound</span><i aria-hidden="true"></i></button>
-  </header>
+<main class="stack">
+  <div class="unit">
+    <header class="plate">
+      <h1 class="brand"><b>wl&#8211;1</b> anime watchlog</h1>
+      <span class="grille" aria-hidden="true"></span>
+      <button id="thm" class="snd" type="button" aria-pressed="false"><span>dark</span><i aria-hidden="true"></i></button>
+      <button id="snd" class="snd" type="button" aria-pressed="false"><span>sound</span><i aria-hidden="true"></i></button>
+    </header>
 
-  <section id="lcd" class="lcd" aria-label="Selected title"></section>
-  <div id="say" role="status" style="position:absolute;left:-9999px"></div>
+    <section id="lcd" class="lcd" aria-label="Selected title"></section>
+    <div id="say" role="status" style="position:absolute;left:-9999px"></div>
+  </div>
 
-  <div id="modes" class="modes" role="tablist" aria-label="Lists"></div>
-
-  <section class="deck" aria-label="Controls">
-    <div class="knobwrap">
-      <div class="dial"><div id="knob" class="knob" role="slider" tabindex="0" aria-label="Episode"></div></div>
-      <span id="knobLabel" class="label">episode</span>
-    </div>
-    <div id="pad" class="pad"></div>
-  </section>
-
-  <section id="detail" class="panel" aria-label="Selected title settings"></section>
-
-  <section class="panel" aria-label="Titles">
+  <section class="unit cell" aria-label="Titles">
     <div class="panel-head">
       <span id="listLabel" class="label">tracks</span>
     </div>
@@ -330,7 +321,21 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     <div id="list" class="list"></div>
   </section>
 
-  <section class="panel" aria-label="Add a title">
+  <div class="unit">
+    <div id="modes" class="modes" role="tablist" aria-label="Lists"></div>
+
+    <section class="deck" aria-label="Controls">
+      <div class="knobwrap">
+        <div class="dial"><div id="knob" class="knob" role="slider" tabindex="0" aria-label="Episode"></div></div>
+        <span id="knobLabel" class="label">episode</span>
+      </div>
+      <div id="pad" class="pad"></div>
+    </section>
+
+    <section id="detail" class="panel" aria-label="Selected title settings"></section>
+  </div>
+
+  <section class="unit cell" aria-label="Add a title">
     <span class="label">rec &#9679; new title</span>
     <form id="addForm" class="rec" autocomplete="off">
       <div class="field">
@@ -354,7 +359,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     </form>
   </section>
 
-  <footer class="panel foot">
+  <footer class="unit foot">
     <span class="label">memory: this device</span>
     <div class="fn">
       <button id="exportBtn" class="key" type="button">export</button>
@@ -364,7 +369,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
     <input id="coverFile" type="file" accept="image/*">
   </footer>
 </main>
-<p class="serial">wl&#8211;1 &#183; pocket watchlog &#183; no. 000001</p>
+<p class="serial">wl&#8211;1 &#183; pocket watchlog &#183; fw 1.4</p>
 
 <script>
 (function () {
@@ -562,11 +567,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
 
   // ---------- title suggestions ----------
   var SUGGEST = "query($s:String){Page(perPage:6){media(search:$s,type:ANIME,sort:SEARCH_MATCH){title{romaji english}episodes seasonYear coverImage{extraLarge large medium}}}}";
-  var sug = { timer: null, seq: 0, rows: [], active: -1, picked: null };
+  var sug = { timer: null, seq: 0, rows: [], active: -1, picked: null, say: "" };
   function hideSug() {
     clearTimeout(sug.timer);
     sug.seq++;
-    sug.rows = []; sug.active = -1;
+    sug.rows = []; sug.active = -1; sug.say = "";
     $("sug").hidden = true;
     $("sug").textContent = "";
     $("fTitle").setAttribute("aria-expanded", "false");
@@ -592,7 +597,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
         onclick: function () { pickSug(r); }
       }, pic, h("span", { class: "t", text: r.title }), h("span", { class: "s", text: side.join(" · ") })));
     });
-    box.hidden = !sug.rows.length;
+    if (sug.say) box.appendChild(h("div", { class: "say", text: sug.say }));
+    box.hidden = !sug.rows.length && !sug.say;
     $("fTitle").setAttribute("aria-expanded", String(!!sug.rows.length));
     if (sug.active >= 0) $("fTitle").setAttribute("aria-activedescendant", "sug" + sug.active);
     else $("fTitle").removeAttribute("aria-activedescendant");
@@ -603,7 +609,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({ query: SUGGEST, variables: { s: text } })
-    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    }).then(function (r) {
+      if (!r.ok) { var e = new Error("http"); e.busy = true; throw e; }
+      return r.json();
+    }).then(function (j) {
       if (mine !== sug.seq) return; // a newer keystroke or a pick won
       var media = (j && j.data && j.data.Page && j.data.Page.media) || [];
       var seen = {};
@@ -617,14 +626,22 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action
         return true;
       });
       sug.active = -1;
+      sug.say = sug.rows.length ? "" : "no matches on anilist. you can still add it.";
       drawSug();
-    }).catch(function () {}); // offline or busy: typing still works without suggestions
+    }).catch(function (e) {
+      // Typing still works without suggestions; say why there are none.
+      if (mine !== sug.seq) return;
+      sug.rows = []; sug.active = -1;
+      sug.say = e && e.busy ? "anilist is busy. try again in a minute." : "could not reach anilist. you can still add it.";
+      drawSug();
+    });
   }
   $("fTitle").addEventListener("input", function (e) {
     var text = e.target.value.trim();
     sug.picked = null;
     clearTimeout(sug.timer);
-    if (text.length < 2 || navigator.onLine === false) { hideSug(); return; }
+    if (text.length < 2) { hideSug(); return; }
+    if (!sug.rows.length) { sug.say = "searching anilist…"; drawSug(); }
     sug.timer = setTimeout(function () { suggest(text); }, 350);
   });
   $("fTitle").addEventListener("keydown", function (e) {
